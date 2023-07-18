@@ -1,0 +1,15 @@
+[package]
+name = "cdparanoia3-sys"
+version = "0.1.0"
+edition = "2021"
+authors = ["d-k-bo <d-k-bo@mailbox.org>"]
+description = "Low-level bindings for cdparanoia-3."
+repository = "https://github.com/d-k-bo/cdparanoia-rs"
+license = "LGPL-2.1-or-later"
+keywords = ["cd", "cdrom", "audio-cd", "cdparanoia"]
+categories = ["external-ffi-bindings", "multimedia::audio"]
+
+[dependencies]
+
+[build-dependencies]
+bindgen = "0.66.1"

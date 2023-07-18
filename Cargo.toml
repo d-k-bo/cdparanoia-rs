@@ -1,0 +1,28 @@
+[workspace]
+members = [".", "cdio-paranoia-sys", "cdparanoia3-sys"]
+
+[package]
+name = "cdparanoia"
+version = "0.1.0"
+edition = "2021"
+authors = ["d-k-bo <d-k-bo@mailbox.org>"]
+description = "High-level bindings for libcdio-paranoia/cdparanoia-3."
+repository = "https://github.com/d-k-bo/cdparanoia-rs"
+license = "GPL-3.0-or-later"
+keywords = ["cd", "cdrom", "audio-cd", "cdparanoia", "libcdio"]
+categories = ["api-bindings", "multimedia::audio"]
+
+[dependencies]
+cdio-paranoia-sys = { version = "0.1.0", path = "cdio-paranoia-sys", optional = true }
+cdparanoia3-sys = { version = "0.1.0", path = "cdparanoia3-sys", optional = true }
+num-traits = "0.2.15"
+num_enum = "0.6.1"
+thiserror = "1.0.43"
+
+[features]
+default = ["libcdio-paranoia"]
+libcdio-paranoia = ["dep:cdio-paranoia-sys"]
+cdparanoia-3 = ["dep:cdparanoia3-sys"]
+
+[dev-dependencies]
+hound = "3.5.0"

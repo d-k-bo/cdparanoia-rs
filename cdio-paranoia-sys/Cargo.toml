@@ -1,0 +1,15 @@
+[package]
+name = "cdio-paranoia-sys"
+version = "0.1.0"
+edition = "2021"
+authors = ["d-k-bo <d-k-bo@mailbox.org>"]
+description = "Low-level bindings for libcdio-paranoia."
+repository = "https://github.com/d-k-bo/cdparanoia-rs"
+license = "GPL-3.0-or-later"
+keywords = ["cd", "cdrom", "audio-cd", "cdparanoia", "libcdio"]
+categories = ["external-ffi-bindings", "multimedia::audio"]
+
+[dependencies]
+
+[build-dependencies]
+bindgen = "0.66.1"
