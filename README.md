@@ -27,7 +27,7 @@ let mut paranoia = drive.paranoia();
 let mut writer = hound::WavWriter::create(
     "/tmp/example.wav",
     hound::WavSpec {
-        channels: drive.track_channels(1).unwrap_or(2).into(),
+        channels: paranoia.drive().track_channels(1).unwrap_or(2).into(),
         sample_rate: 44100,
         bits_per_sample: 16,
         sample_format: hound::SampleFormat::Int,

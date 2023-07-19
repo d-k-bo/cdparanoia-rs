@@ -27,7 +27,7 @@
 //! let mut writer = hound::WavWriter::create(
 //!     "/tmp/example.wav",
 //!     hound::WavSpec {
-//!         channels: drive.track_channels(1).unwrap_or(2).into(),
+//!         channels: paranoia.drive().track_channels(1).unwrap_or(2).into(),
 //!         sample_rate: 44100,
 //!         bits_per_sample: 16,
 //!         sample_format: hound::SampleFormat::Int,
@@ -125,8 +125,7 @@ impl Drive {
 
 impl Drive {
     /// Get a [`Paranoia`] instance for reading audio data.
-    #[allow(clippy::needless_lifetimes)]
-    pub fn paranoia<'drive>(&'drive self) -> Paranoia<'drive> {
+    pub fn paranoia(self) -> Paranoia {
         Paranoia::new(self)
     }
 }
