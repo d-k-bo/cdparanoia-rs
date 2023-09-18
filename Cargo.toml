@@ -18,11 +18,14 @@ cdparanoia3-sys = { version = "0.1.0", path = "cdparanoia3-sys", optional = true
 num-traits = "0.2.15"
 num_enum = "0.6.1"
 thiserror = "1.0.43"
+tracing = { version = "0.1.37", optional = true }
 
 [features]
 default = ["libcdio-paranoia"]
 libcdio-paranoia = ["dep:cdio-paranoia-sys"]
 cdparanoia-3 = ["dep:cdparanoia3-sys"]
+tracing = ["dep:tracing", "cdparanoia3-sys?/libc"]
 
 [dev-dependencies]
 hound = "3.5.0"
+tracing-subscriber = "0.3.17"

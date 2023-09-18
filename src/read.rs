@@ -19,6 +19,9 @@ impl Drop for Paranoia {
 impl Paranoia {
     pub(crate) fn new(drive: Drive) -> Self {
         let ptr = unsafe { crate::ffi::paranoia_init(drive.as_ptr()) };
+
+        drive.check_messages();
+
         assert!(!ptr.is_null(), "paranoia_init should be infallible");
         Self { ptr, drive }
     }
@@ -110,6 +113,9 @@ impl<'paranoia> DiscReader<'paranoia> {
         let data = unsafe {
             let ptr =
                 crate::ffi::paranoia_read_limited(self.paranoia.as_ptr(), None, self.max_retries);
+
+            self.paranoia.drive.check_messages();
+
             if ptr.is_null() {
                 return Some(Err(Error::Read));
             }

@@ -64,6 +64,11 @@ compile_error!(
     "Either feature \"libcdio-paranoia\" or \"cdparanoia-3\" must be enabled for this crate."
 );
 
+#[cfg(feature = "tracing")]
+const MESSAGE_DEST: i32 = crate::ffi::CDDA_MESSAGE_LOGIT as i32;
+#[cfg(not(feature = "tracing"))]
+const MESSAGE_DEST: i32 = crate::ffi::CDDA_MESSAGE_PRINTIT as i32;
+
 mod error;
 mod read;
 
@@ -80,6 +85,7 @@ pub struct Drive {
 
 impl Drop for Drive {
     fn drop(&mut self) {
+        self.check_messages();
         unsafe { crate::ffi::cdda_close(self.ptr) };
     }
 }
@@ -87,37 +93,35 @@ impl Drop for Drive {
 impl Drive {
     /// Open a default CD-ROM drive with a CD-DA in it.
     pub fn find() -> Result<Self> {
-        let ptr = unsafe {
-            crate::ffi::cdda_find_a_cdrom(
-                crate::ffi::CDDA_MESSAGE_PRINTIT as i32,
-                std::ptr::null_mut(),
-            )
-        };
+        let ptr = unsafe { crate::ffi::cdda_find_a_cdrom(MESSAGE_DEST, std::ptr::null_mut()) };
         if ptr.is_null() {
             return Err(Error::CantOpenDrive);
         }
         let drive = Drive { ptr };
 
+        drive.check_messages();
+
         ParanoiaError::check_result(unsafe { crate::ffi::cdda_open(drive.as_ptr()) })?;
+
+        drive.check_messages();
 
         Ok(drive)
     }
     /// Open a specific CD-ROM drive with a CD-DA in it.
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
         let path = CString::new(path.as_ref().as_os_str().as_bytes())?;
-        let ptr = unsafe {
-            crate::ffi::cdda_identify(
-                path.as_ptr(),
-                crate::ffi::CDDA_MESSAGE_PRINTIT as i32,
-                std::ptr::null_mut(),
-            )
-        };
+        let ptr =
+            unsafe { crate::ffi::cdda_identify(path.as_ptr(), MESSAGE_DEST, std::ptr::null_mut()) };
         if ptr.is_null() {
             return Err(Error::CantOpenDrive);
         }
         let drive = Drive { ptr };
 
+        drive.check_messages();
+
         ParanoiaError::check_result(unsafe { crate::ffi::cdda_open(drive.as_ptr()) })?;
+
+        drive.check_messages();
 
         Ok(drive)
     }
@@ -135,29 +139,30 @@ impl Drive {
     pub fn track_first_sector(&self, track: u8) -> Result<u32> {
         #[cfg(not(feature = "libcdio-paranoia"))]
         let track = track.into();
-        match ParanoiaError::check_result(unsafe {
+        let lsn = ParanoiaError::check_result(unsafe {
             crate::ffi::cdda_track_firstsector(self.as_ptr(), track)
-        }) {
-            Ok(lsn) => Ok(lsn as u32),
-            Err(e) => Err(e.into()),
-        }
+        })? as u32;
+        self.check_messages();
+        Ok(lsn)
     }
     /// Get the last logical sector number of a track.
     /// This is generally one less than the start of the next track.
     pub fn track_last_sector(&self, track: u8) -> Result<u32> {
         #[cfg(not(feature = "libcdio-paranoia"))]
         let track = track.into();
-        match ParanoiaError::check_result(unsafe {
+        let lsn = ParanoiaError::check_result(unsafe {
             crate::ffi::cdda_track_lastsector(self.as_ptr(), track)
-        }) {
-            Ok(lsn) => Ok(lsn as u32),
-            Err(e) => Err(e.into()),
-        }
+        })? as u32;
+        self.check_messages();
+        Ok(lsn)
     }
     /// Get the number of tracks on the CD.
     #[allow(clippy::let_and_return)]
     pub fn tracks(&self) -> u8 {
         let tracks = unsafe { crate::ffi::cdda_tracks(self.as_ptr()) };
+
+        self.check_messages();
+
         #[cfg(not(feature = "libcdio-paranoia"))]
         let tracks = tracks.try_into().unwrap();
         tracks
@@ -171,18 +176,18 @@ impl Drive {
         #[cfg(not(feature = "libcdio-paranoia"))]
         let lsn = lsn.into();
 
-        let track = unsafe { crate::ffi::cdda_sector_gettrack(self.as_ptr(), lsn) };
+        let track = ParanoiaError::check_result(unsafe {
+            crate::ffi::cdda_sector_gettrack(self.as_ptr(), lsn)
+        })?;
 
-        match ParanoiaError::check_result(track) {
-            Ok(track) => {
-                #[cfg(feature = "libcdio-paranoia")]
-                if track as u32 == crate::ffi::cdio_track_enums::CDIO_INVALID_TRACK {
-                    return Err(ParanoiaError::InvalidTrackNumber.into());
-                }
-                Ok(track.try_into().unwrap())
-            }
-            Err(e) => Err(e.into()),
+        self.check_messages();
+
+        #[cfg(feature = "libcdio-paranoia")]
+        if track as u32 == crate::ffi::cdio_track_enums::CDIO_INVALID_TRACK {
+            return Err(ParanoiaError::InvalidTrackNumber.into());
         }
+
+        Ok(track.try_into().unwrap())
     }
     /// Get the number of channels in a track.
     ///
@@ -191,21 +196,34 @@ impl Drive {
     pub fn track_channels(&self, track: u8) -> Option<u8> {
         #[cfg(not(feature = "libcdio-paranoia"))]
         let track = track.into();
-        unsafe { crate::ffi::cdda_track_channels(self.as_ptr(), track) }
+        let track_channels = unsafe { crate::ffi::cdda_track_channels(self.as_ptr(), track) }
             .try_into()
-            .ok()
+            .ok();
+
+        self.check_messages();
+
+        track_channels
     }
     /// Check if a track is an audio track.
     pub fn track_audio(&self, track: u8) -> bool {
         #[cfg(not(feature = "libcdio-paranoia"))]
         let track = track.into();
-        unsafe { crate::ffi::cdda_track_audiop(self.as_ptr(), track) == 1 }
+        let track_audio = unsafe { crate::ffi::cdda_track_audiop(self.as_ptr(), track) == 1 };
+
+        self.check_messages();
+
+        track_audio
     }
     /// Check if a track has copy permit set.
     pub fn track_copy_permitted(&self, track: u8) -> bool {
         #[cfg(not(feature = "libcdio-paranoia"))]
         let track = track.into();
-        unsafe { crate::ffi::cdda_track_copyp(self.as_ptr(), track) == 1 }
+        let track_copy_permitted =
+            unsafe { crate::ffi::cdda_track_copyp(self.as_ptr(), track) == 1 };
+
+        self.check_messages();
+
+        track_copy_permitted
     }
     /// Check if a track has linear preemphasis set.
     ///
@@ -213,25 +231,32 @@ impl Drive {
     pub fn track_linear_preemphasis(&self, track: u8) -> bool {
         #[cfg(not(feature = "libcdio-paranoia"))]
         let track = track.into();
-        unsafe { crate::ffi::cdda_track_preemp(self.as_ptr(), track) == 1 }
+        let track_linear_preemphasis =
+            unsafe { crate::ffi::cdda_track_preemp(self.as_ptr(), track) == 1 };
+
+        self.check_messages();
+
+        track_linear_preemphasis
     }
     /// Get the first logical sector number of the first audio track.
     pub fn disc_first_sector(&self) -> Result<u32> {
-        match ParanoiaError::check_result(unsafe {
+        let lsn = ParanoiaError::check_result(unsafe {
             crate::ffi::cdda_disc_firstsector(self.as_ptr())
-        }) {
-            Ok(lsn) => Ok(lsn as u32),
-            Err(e) => Err(e.into()),
-        }
+        })? as u32;
+
+        self.check_messages();
+
+        Ok(lsn)
     }
     /// Get the last logical sector number of the last audio track.
     pub fn disc_last_sector(&self) -> Result<u32> {
-        match ParanoiaError::check_result(unsafe {
+        let lsn = ParanoiaError::check_result(unsafe {
             crate::ffi::cdda_disc_lastsector(self.as_ptr())
-        }) {
-            Ok(lsn) => Ok(lsn as u32),
-            Err(e) => Err(e.into()),
-        }
+        })? as u32;
+
+        self.check_messages();
+
+        Ok(lsn)
     }
 }
 
@@ -239,5 +264,40 @@ impl Drive {
     #[inline]
     pub fn as_ptr(&self) -> *mut crate::ffi::cdrom_drive {
         self.ptr
+    }
+    #[cfg(not(feature = "tracing"))]
+    pub(crate) fn check_messages(&self) {}
+    #[cfg(feature = "tracing")]
+    pub(crate) fn check_messages(&self) {
+        use std::ffi::CStr;
+
+        use tracing::{error, info};
+
+        unsafe {
+            if let Some(errorbuf) = crate::ffi::cdda_errors(self.as_ptr()).as_mut() {
+                CStr::from_ptr(errorbuf)
+                    .to_string_lossy()
+                    .lines()
+                    .for_each(|line| error!("{line}"));
+
+                #[cfg(feature = "libcdio-paranoia")]
+                crate::ffi::cdio_cddap_free_messages(errorbuf);
+                #[cfg(not(feature = "libcdio-paranoia"))]
+                crate::ffi::libc::free(errorbuf as *mut std::ffi::c_char as *mut std::ffi::c_void);
+            }
+            if let Some(messagebuf) = crate::ffi::cdda_messages(self.as_ptr()).as_mut() {
+                CStr::from_ptr(messagebuf)
+                    .to_string_lossy()
+                    .lines()
+                    .for_each(|line| info!("{line}"));
+
+                #[cfg(feature = "libcdio-paranoia")]
+                crate::ffi::cdio_cddap_free_messages(messagebuf);
+                #[cfg(not(feature = "libcdio-paranoia"))]
+                crate::ffi::libc::free(
+                    messagebuf as *mut std::ffi::c_char as *mut std::ffi::c_void,
+                );
+            }
+        }
     }
 }
