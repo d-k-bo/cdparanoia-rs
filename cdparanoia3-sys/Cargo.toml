@@ -10,6 +10,7 @@ keywords = ["cd", "cdrom", "audio-cd", "cdparanoia"]
 categories = ["external-ffi-bindings", "multimedia::audio"]
 
 [dependencies]
+libc = { version = "0.2.148", optional = true }
 
 [build-dependencies]
 bindgen = "0.66.1"
